@@ -108,12 +108,18 @@ reconciliation; charts consume analysis results without recomputing statistics.
 - If both paths fail, the configured fallback annual rate is clearly warned and CPI output is marked
   unavailable; the pipeline never silently substitutes an invented macro series.
 
-Store credentials in an environment variable—never commit them:
+Store credentials securely—never commit them. For local Jupyter or the CLI, use an environment
+variable:
 
 ```python
 import os
 os.environ["FRED_API_KEY"] = "your_32_character_key"
 ```
+
+In Colab, open the **Secrets** panel (key icon), add a secret named `FRED_API_KEY`, and enable
+notebook access. The notebook reads that secret without displaying it. If the authenticated API
+fails, the downloader attempts FRED's public CSV route; if both fail, the report clearly discloses
+the configured constant-rate fallback.
 
 Relevant documentation: [yfinance download](https://ranaroussi.github.io/yfinance/reference/api/yfinance.download.html),
 [FRED observations API](https://fred.stlouisfed.org/docs/api/fred/series_observations.html), and

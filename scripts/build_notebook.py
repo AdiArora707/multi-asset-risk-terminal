@@ -24,6 +24,8 @@ CELLS = [
     markdown(
         """# Multi-Asset Performance and Risk Terminal
 
+[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/AdiArora707/multi-asset-risk-terminal/blob/main/notebooks/Multi_Asset_Performance_Risk_Terminal.ipynb)
+
 **Equities · Bonds · Commodities · Real Estate · Cash**
 
 This Colab is the research interface to a reusable, tested Python analytics package. It downloads
@@ -135,17 +137,26 @@ display(pd.DataFrame({"Ticker": config.assets, "Target Weight": config.weights})
         """## 3. Data collection pipeline
 
 The run uses adjusted Yahoo Finance closes (`auto_adjust=True`) plus FRED `DGS3MO` and `CPIAUCSL`.
-Set `FRED_API_KEY` in the environment to use the authenticated observations API. Otherwise, the
-official FRED CSV endpoint is used. Downloads are retried, validated, and cached by parameters."""
+The cell securely reads `FRED_API_KEY` from Colab Secrets or the local environment. Without a key,
+the official FRED CSV route is attempted before the disclosed constant-rate fallback. Downloads are
+retried, validated, and cached by parameters."""
     ),
     code(
-        """# Optional in Colab: avoid displaying or committing the key.
-# os.environ["FRED_API_KEY"] = "paste_your_key_here"
+        """# Secure FRED authentication: never paste a key into a public notebook.
+FRED_API_KEY = os.getenv("FRED_API_KEY")
+if IN_COLAB and not FRED_API_KEY:
+    try:
+        from google.colab import userdata
+        FRED_API_KEY = userdata.get("FRED_API_KEY")
+    except Exception:
+        print("FRED_API_KEY was not found in Colab Secrets; the public CSV route will be tried.")
+
+print("FRED authenticated API:", "enabled" if FRED_API_KEY else "not configured")
 
 results = run_analysis(
     config,
     refresh=REFRESH_DATA,
-    fred_api_key=os.getenv("FRED_API_KEY"),
+    fred_api_key=FRED_API_KEY,
 )
 
 print(f"Price observations: {len(results.prices):,}")

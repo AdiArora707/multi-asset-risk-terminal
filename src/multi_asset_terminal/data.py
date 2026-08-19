@@ -6,6 +6,7 @@ import hashlib
 import io
 import json
 import logging
+import re
 from collections.abc import Iterable
 from datetime import timedelta
 from pathlib import Path
@@ -155,9 +156,9 @@ def align_prices(
 
 def _requests_session() -> requests.Session:
     retry = Retry(
-        total=4,
-        connect=4,
-        read=4,
+        total=2,
+        connect=2,
+        read=2,
         backoff_factor=0.7,
         status_forcelist=(429, 500, 502, 503, 504),
         allowed_methods=frozenset({"GET"}),
@@ -185,47 +186,70 @@ def download_fred_series(
         cached = _read_cached_frame(cache_file)
         return cached.iloc[:, 0].rename(series_id)
 
+    api_key = api_key.strip() if api_key else None
+    if api_key and not re.fullmatch(r"[a-z0-9]{32}", api_key):
+        raise DataDownloadError(
+            "FRED_API_KEY must be exactly 32 lowercase alphanumeric characters."
+        )
+
     session = _requests_session()
+    series: pd.Series | None = None
+    failures: list[str] = []
     try:
         if api_key:
-            params = {
-                "series_id": series_id,
-                "api_key": api_key,
-                "file_type": "json",
-                "observation_start": start,
-            }
-            if end:
-                params["observation_end"] = end
-            response = session.get(FRED_OBSERVATIONS_URL, params=params, timeout=30)
-            response.raise_for_status()
-            observations = response.json().get("observations", [])
-            frame = pd.DataFrame(observations)
-            if frame.empty or not {"date", "value"}.issubset(frame.columns):
-                raise DataDownloadError(f"FRED returned no observations for {series_id}.")
-            series = pd.Series(
-                pd.to_numeric(frame["value"].replace(".", np.nan), errors="coerce").to_numpy(),
-                index=pd.to_datetime(frame["date"]),
-                name=series_id,
-            )
-        else:
+            try:
+                params = {
+                    "series_id": series_id,
+                    "api_key": api_key,
+                    "file_type": "json",
+                    "observation_start": start,
+                }
+                if end:
+                    params["observation_end"] = end
+                response = session.get(FRED_OBSERVATIONS_URL, params=params, timeout=(10, 30))
+                response.raise_for_status()
+                observations = response.json().get("observations", [])
+                frame = pd.DataFrame(observations)
+                if frame.empty or not {"date", "value"}.issubset(frame.columns):
+                    raise DataDownloadError(
+                        f"Authenticated FRED API returned no observations for {series_id}."
+                    )
+                series = pd.Series(
+                    pd.to_numeric(frame["value"].replace(".", np.nan), errors="coerce").to_numpy(),
+                    index=pd.to_datetime(frame["date"]),
+                    name=series_id,
+                )
+            except (requests.RequestException, ValueError, KeyError, DataDownloadError) as exc:
+                # Never include the raw exception: requests may embed the secret query parameter.
+                failures.append(f"authenticated API ({type(exc).__name__})")
+
+        if series is None:
+            # The public graph CSV is a secondary path. The analytics pipeline has
+            # a clearly disclosed constant-rate fallback if both FRED routes fail.
             params = {"id": series_id, "cosd": start}
             if end:
                 params["coed"] = end
-            response = session.get(FRED_CSV_URL, params=params, timeout=30)
-            response.raise_for_status()
-            frame = pd.read_csv(io.StringIO(response.text))
-            if len(frame.columns) < 2:
-                raise DataDownloadError(f"FRED CSV response is malformed for {series_id}.")
-            series = pd.Series(
-                pd.to_numeric(frame.iloc[:, 1].replace(".", np.nan), errors="coerce").to_numpy(),
-                index=pd.to_datetime(frame.iloc[:, 0]),
-                name=series_id,
-            )
-    except (requests.RequestException, ValueError, KeyError) as exc:
-        raise DataDownloadError(f"FRED download failed for {series_id}: {exc}") from exc
+            try:
+                response = session.get(FRED_CSV_URL, params=params, timeout=(10, 20))
+                response.raise_for_status()
+                frame = pd.read_csv(io.StringIO(response.text))
+                if len(frame.columns) < 2:
+                    raise DataDownloadError(f"FRED CSV response is malformed for {series_id}.")
+                series = pd.Series(
+                    pd.to_numeric(
+                        frame.iloc[:, 1].replace(".", np.nan), errors="coerce"
+                    ).to_numpy(),
+                    index=pd.to_datetime(frame.iloc[:, 0]),
+                    name=series_id,
+                )
+            except (requests.RequestException, ValueError, KeyError, DataDownloadError) as exc:
+                failures.append(f"public CSV ({type(exc).__name__})")
     finally:
         session.close()
 
+    if series is None:
+        attempted = ", ".join(failures) or "no data route"
+        raise DataDownloadError(f"FRED download failed for {series_id}; attempted {attempted}.")
     series = series[~series.index.duplicated(keep="last")].sort_index().dropna()
     if series.empty:
         raise DataDownloadError(f"FRED returned no numeric observations for {series_id}.")
