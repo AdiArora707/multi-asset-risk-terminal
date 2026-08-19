@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "multi-asset-risk-terminal"
+version = "1.0.0"
+description = "A production-style multi-asset performance, risk, attribution, and tear-sheet engine."
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [{name = "Your Name"}]
+dependencies = [
+    "numpy>=1.26,<3",
+    "pandas>=2.1,<4",
+    "scipy>=1.11,<2",
+    "statsmodels>=0.14,<1",
+    "yfinance>=0.2.54,<1",
+    "plotly>=5.18,<7",
+    "quantstats>=0.0.62,<1",
+    "requests>=2.31,<3",
+]
+
+[project.optional-dependencies]
+notebook = ["nbformat>=5.9,<6", "ipywidgets>=8,<9"]
+dev = ["pytest>=8,<9", "ruff>=0.6,<1"]
+
+[project.scripts]
+multi-asset-terminal = "multi_asset_terminal.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"

@@ -1,0 +1,32 @@
+{
+  "assets": {
+    "US Equity": "VTI",
+    "International Equity": "VXUS",
+    "US Bonds": "BND",
+    "Gold": "GLD",
+    "Real Estate": "VNQ",
+    "Cash ETF": "BIL"
+  },
+  "weights": {
+    "US Equity": 0.30,
+    "International Equity": 0.15,
+    "US Bonds": 0.25,
+    "Gold": 0.10,
+    "Real Estate": 0.10,
+    "Cash ETF": 0.10
+  },
+  "benchmark": "SPY",
+  "start": "2015-01-01",
+  "end": null,
+  "rebalance_frequency": "M",
+  "calendar_mode": "intersection",
+  "risk_free_series": "DGS3MO",
+  "inflation_series": "CPIAUCSL",
+  "inflation_release_lag_days": 15,
+  "periods_per_year": 252,
+  "rolling_window": 252,
+  "var_confidence": 0.95,
+  "fallback_annual_risk_free_rate": 0.02,
+  "cache_dir": "data/cache",
+  "output_dir": "outputs"
+}
