@@ -58,6 +58,13 @@ if IN_COLAB:
         if "YOUR_USERNAME" in REPO_URL or not REPO_URL.startswith("https://github.com/"):
             raise ValueError("REPO_URL must point to a valid GitHub repository.")
         subprocess.run(["git", "clone", "--depth", "1", REPO_URL, str(project_dir)], check=True)
+    else:
+        # Colab runtimes can survive notebook reloads. Fast-forward the existing
+        # clone so an old package cannot silently generate a stale report.
+        subprocess.run(
+            ["git", "-C", str(project_dir), "pull", "--ff-only", "origin", "main"],
+            check=True,
+        )
     os.chdir(project_dir)
 else:
     project_dir = Path.cwd()
@@ -68,7 +75,14 @@ subprocess.run(
     [sys.executable, "-m", "pip", "install", "-q", "-e", ".[notebook]"],
     check=True,
 )
-print(f"Project ready: {project_dir}")"""
+try:
+    commit = subprocess.check_output(
+        ["git", "-C", str(project_dir), "rev-parse", "--short", "HEAD"],
+        text=True,
+    ).strip()
+except (FileNotFoundError, subprocess.CalledProcessError):
+    commit = "local checkout"
+print(f"Project ready: {project_dir} (commit {commit})")"""
     ),
     markdown(
         """## 1. Imports and display configuration
