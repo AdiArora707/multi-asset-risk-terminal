@@ -37,8 +37,8 @@ HTML tear sheet.
     markdown(
         """## 0. Colab setup
 
-When running in Google Colab, change `REPO_URL` to your GitHub repository. A local Jupyter session
-automatically uses the checked-out project. Dependency installation is explicit and repeatable."""
+When running in Google Colab, the setup cell clones the published GitHub repository. A local Jupyter
+session automatically uses the checked-out project. Dependency installation is explicit and repeatable."""
     ),
     code(
         """#@title Install the project
@@ -48,13 +48,13 @@ import sys
 from pathlib import Path
 
 IN_COLAB = "google.colab" in sys.modules
-REPO_URL = "https://github.com/YOUR_USERNAME/multi-asset-risk-terminal.git"  #@param {type:"string"}
+REPO_URL = "https://github.com/AdiArora707/multi-asset-risk-terminal.git"  #@param {type:"string"}
 
 if IN_COLAB:
     project_dir = Path("/content/multi-asset-risk-terminal")
     if not project_dir.exists():
-        if "YOUR_USERNAME" in REPO_URL:
-            raise ValueError("Set REPO_URL to your GitHub fork before running this cell.")
+        if "YOUR_USERNAME" in REPO_URL or not REPO_URL.startswith("https://github.com/"):
+            raise ValueError("REPO_URL must point to a valid GitHub repository.")
         subprocess.run(["git", "clone", "--depth", "1", REPO_URL, str(project_dir)], check=True)
     os.chdir(project_dir)
 else:
